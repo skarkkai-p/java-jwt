@@ -40,7 +40,7 @@ public class JWTSigner {
      * 
      * Non-registered claims are not inspected.
      */
-    public String encode(Map<String, Object> claims, String key, Algorithm algorithm) {
+    public String sign(Map<String, Object> claims, String key, Algorithm algorithm, Options options) {
         List<String> segments = new ArrayList<String>();
 
         try {
@@ -55,14 +55,32 @@ public class JWTSigner {
     }
 
     /**
+     * Generate a JSON Web Token with all options unset.
+     * 
+     * For details, see the four parameter variant of this method.
+     */
+    public String sign(Map<String, Object> claims, String key, Algorithm algorithm) {
+        return sign(claims, key, algorithm, new Options());
+    }
+    
+    /**
      * Generate a JSON Web Token using the default algorithm HMAC SHA-256 ("HS256").
      * 
-     * For details, see the three parameter variant of this method.
+     * For details, see the four parameter variant of this method.
      */
-    public String encode(Map<String, Object> claims, String key) {
-        return encode(claims, key, Algorithm.HS256);
+    public String sign(Map<String, Object> claims, String key, Options options) {
+        return sign(claims, key, Algorithm.HS256, options);
     }
-
+    
+    /**
+     * Generate a JSON Web Token using the default algorithm HMAC SHA-256 ("HS256") and all options unset.
+     * 
+     * For details, see the four parameter variant of this method.
+     */
+    public String sign(Map<String, Object> claims, String key) {
+        return sign(claims, key, Algorithm.HS256, new Options());
+    }
+    
     /**
      * Generate the header part of a JSON web token.
      */
@@ -95,7 +113,7 @@ public class JWTSigner {
         String payload = new ObjectMapper().writeValueAsString(claims);
         return base64UrlEncode(payload.getBytes("UTF-8"));
     }
-
+    
     private void enforceIntDate(Map<String, Object> claims, String claimName) {
         Object value = handleNullValue(claims, claimName);
         if (value == null)
@@ -223,5 +241,60 @@ public class JWTSigner {
         }
 
         return joined.toString();
+    }
+
+    public static class Options {
+        private Integer expirySeconds;
+        private Integer notValidBeforeLeeway;
+        private boolean setIssuedAt;
+        private boolean setJwtId;
+        
+        public Integer getExpirySeconds() {
+            return expirySeconds;
+        }
+        /**
+         * Set JWT claim "exp" to current timestamp plus this value.
+         * Overrides content of <code>claims</code> in <code>sign()</code>.
+         */
+        public Options setExpirySeconds(Integer expirySeconds) {
+            this.expirySeconds = expirySeconds;
+            return this;
+        }
+        
+        public Integer getNotValidBeforeLeeway() {
+            return notValidBeforeLeeway;
+        }
+        /**
+         * Set JWT claim "nbf" to current timestamp minus this value.
+         * Overrides content of <code>claims</code> in <code>sign()</code>.
+         */
+        public Options setNotValidBeforeLeeway(Integer notValidBeforeLeeway) {
+            this.notValidBeforeLeeway = notValidBeforeLeeway;
+            return this;
+        }
+        
+        public boolean isSetIssuedAt() {
+            return setIssuedAt;
+        }
+        /**
+         * Set JWT claim "iat" to current timestamp. Defaults to false.
+         * Overrides content of <code>claims</code> in <code>sign()</code>.
+         */
+        public Options setSetIssuedAt(boolean setIssuedAt) {
+            this.setIssuedAt = setIssuedAt;
+            return this;
+        }
+        
+        public boolean isSetJwtId() {
+            return setJwtId;
+        }
+        /**
+         * Set JWT claim "jti" to a pseudo random unique value (type 4 UUID). Defaults to false.
+         * Overrides content of <code>claims</code> in <code>sign()</code>.
+         */
+        public Options setSetJwtId(boolean setJwtId) {
+            this.setJwtId = setJwtId;
+            return this;
+        }
     }
 }
