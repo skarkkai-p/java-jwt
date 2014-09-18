@@ -271,8 +271,9 @@ public class JWTSigner {
         /**
          * Algorithm to sign JWT with. Default is <code>HS256</code>.
          */
-        public void setAlgorithm(Algorithm algorithm) {
+        public Options setAlgorithm(Algorithm algorithm) {
             this.algorithm = algorithm;
+            return this;
         }
         
         

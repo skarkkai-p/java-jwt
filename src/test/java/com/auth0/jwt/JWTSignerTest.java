@@ -162,8 +162,8 @@ public class JWTSignerTest {
     @Test
     public void shouldOptionsNone() throws Exception {
         HashMap<String, Object> claims = new HashMap<String, Object>();
-        signer.sign(claims, "my secret", new JWTSigner.Options());
-        
+        String token = signer.sign(claims, "my secret", new JWTSigner.Options());
+        assertEquals("eyJ0eXBlIjoiSldUIiwiYWxnIjoiSFMyNTYifQ.e30.22wExCVEVtV1rZU51TB9W64deZc_ZN7mc_Z1Yq0dmo0", token);
     }
     
     @Test
@@ -172,6 +172,14 @@ public class JWTSignerTest {
         signer.sign(claims, "my secret", new JWTSigner.Options()
                 .setExpirySeconds(1000).setNotValidBeforeLeeway(5)
                 .setIssuedAt(true).setJwtId(true));
-        
     }
+
+    @Test
+    public void shouldOptionsAlgorithm() throws Exception {
+        HashMap<String, Object> claims = new HashMap<String, Object>();
+        String token = signer.sign(claims, "my secret",
+                new JWTSigner.Options().setAlgorithm(Algorithm.HS512));
+        assertEquals("eyJ0eXBlIjoiSldUIiwiYWxnIjoiSFM1MTIifQ.e30.gH4cjvHOMA2QcZjwSqO-VZ4tyah8hDMVqUGAOth7vBWweOIzCwohpOlpLoRCKeDD3PyMqE1gwHqGuWDk2VuYmQ", token);
+    }
+
 }
