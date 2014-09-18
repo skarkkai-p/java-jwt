@@ -26,6 +26,11 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
  * No support for RSA encryption at present
  */
 public class JWTSigner {
+    private final String secret;
+    
+    public JWTSigner(String secret) {
+        this.secret = secret;
+    }
 
     /**
      * Generate a JSON Web Token.
@@ -43,11 +48,11 @@ public class JWTSigner {
      *               Any claims set automatically as specified in
      *               the "options" parameter override claims in this map.
      *               
-     * @param key Key to use in signing. Used as-is without Base64 encoding.
+     * @param secret Key to use in signing. Used as-is without Base64 encoding.
      * 
      * @param options Allow choosing the signing algorithm, and automatic setting of some registered claims.
      */
-    public String sign(Map<String, Object> claims, String key, Options options) {
+    public String sign(Map<String, Object> claims, Options options) {
         Algorithm algorithm = Algorithm.HS256;
         if (options != null && options.algorithm != null)
             algorithm = options.algorithm;
@@ -56,7 +61,7 @@ public class JWTSigner {
         try {
             segments.add(encodedHeader(algorithm));
             segments.add(encodedPayload(claims, options));
-            segments.add(encodedSignature(join(segments, "."), key, algorithm));
+            segments.add(encodedSignature(join(segments, "."), algorithm));
         } catch (Exception e) {
             throw (e instanceof RuntimeException) ? (RuntimeException) e : new RuntimeException(e);
         }
@@ -68,12 +73,12 @@ public class JWTSigner {
      * Generate a JSON Web Token using the default algorithm HMAC SHA-256 ("HS256")
      * and no claims automatically set.
      *
-     * @param key Key to use in signing. Used as-is without Base64 encoding.
+     * @param secret Key to use in signing. Used as-is without Base64 encoding.
      * 
-     * For details, see the three parameter variant of this method.
+     * For details, see the two parameter variant of this method.
      */
-    public String sign(Map<String, Object> claims, String key) {
-        return sign(claims, key, null);
+    public String sign(Map<String, Object> claims) {
+        return sign(claims, null);
     }
     
     /**
@@ -201,8 +206,8 @@ public class JWTSigner {
     /**
      * Sign the header and payload
      */
-    private String encodedSignature(String signingInput, String key, Algorithm algorithm) throws Exception {
-        byte[] signature = sign(algorithm, signingInput, key);
+    private String encodedSignature(String signingInput, Algorithm algorithm) throws Exception {
+        byte[] signature = sign(algorithm, signingInput, secret);
         return base64UrlEncode(signature);
     }
 
@@ -216,12 +221,12 @@ public class JWTSigner {
     /**
      * Switch the signing algorithm based on input, RSA not supported
      */
-    private byte[] sign(Algorithm algorithm, String msg, String key) throws Exception {
+    private static byte[] sign(Algorithm algorithm, String msg, String secret) throws Exception {
         switch (algorithm) {
         case HS256:
         case HS384:
         case HS512:
-            return signHmac(algorithm, msg, key);
+            return signHmac(algorithm, msg, secret);
         case RS256:
         case RS384:
         case RS512:
@@ -233,9 +238,9 @@ public class JWTSigner {
     /**
      * Sign an input string using HMAC and return the encrypted bytes
      */
-    private byte[] signHmac(Algorithm algorithm, String msg, String key) throws Exception {
+    private static byte[] signHmac(Algorithm algorithm, String msg, String secret) throws Exception {
         Mac mac = Mac.getInstance(algorithm.getValue());
-        mac.init(new SecretKeySpec(key.getBytes(), algorithm.getValue()));
+        mac.init(new SecretKeySpec(secret.getBytes(), algorithm.getValue()));
         return mac.doFinal(msg.getBytes());
     }
 

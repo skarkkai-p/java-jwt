@@ -17,15 +17,17 @@ import org.junit.Test;
  */
 public class RoundtripTest {
     private static final String SECRET;
+    private static final String SECRET_BASE64;
     static {
         try {
-            SECRET = Base64.encodeBase64String("my secret".getBytes("UTF-8"));
+            SECRET = "my secret";
+            SECRET_BASE64 = Base64.encodeBase64String(SECRET.getBytes("UTF-8"));
         } catch (UnsupportedEncodingException e) {
             throw new RuntimeException(e);
         }
     }
-    private static JWTSigner signer = new JWTSigner();
-    private static JWTVerifier verifier = new JWTVerifier(SECRET);
+    private static JWTSigner signer = new JWTSigner(SECRET);
+    private static JWTVerifier verifier = new JWTVerifier(SECRET_BASE64);
     
     /*
      * Roundtrip of different datatypes.
@@ -33,7 +35,7 @@ public class RoundtripTest {
     @Test
     public void shouldEmpty() throws Exception {
         HashMap<String, Object> claims = new HashMap<String, Object>();
-        String token = signer.sign(claims, "my secret");
+        String token = signer.sign(claims);
         Map<String, Object> decoded = verifier.verify(token);
         assertEquals(claims, decoded);
     }
@@ -42,7 +44,7 @@ public class RoundtripTest {
     public void shouldString() throws Exception {
         HashMap<String, Object> claims = new HashMap<String, Object>();
         claims.put("foo", "bar");
-        String token = signer.sign(claims, "my secret");
+        String token = signer.sign(claims);
         Map<String, Object> decoded = verifier.verify(token);
         assertEquals(claims, decoded);
     }
@@ -51,7 +53,7 @@ public class RoundtripTest {
     public void shouldShort() throws Exception {
         HashMap<String, Object> claims = new HashMap<String, Object>();
         claims.put("foo", (short) -10);
-        String token = signer.sign(claims, "my secret");
+        String token = signer.sign(claims);
         Map<String, Object> decoded = verifier.verify(token);
         Number fooValue = (Number) decoded.get("foo");
         decoded.put("foo", fooValue.shortValue());
@@ -62,7 +64,7 @@ public class RoundtripTest {
     public void shouldLong() throws Exception {
         HashMap<String, Object> claims = new HashMap<String, Object>();
         claims.put("foo", Long.MAX_VALUE);
-        String token = signer.sign(claims, "my secret");
+        String token = signer.sign(claims);
         Map<String, Object> decoded = verifier.verify(token);
         assertEquals(claims, decoded);
     }
@@ -74,7 +76,7 @@ public class RoundtripTest {
         user.setUsername("foo");
         user.setPassword("bar");
         claims.put("user", user);
-        String token = signer.sign(claims, "my secret");
+        String token = signer.sign(claims);
         Map<String, Object> decoded = verifier.verify(token);
         HashMap<String, String> expectedUser = new HashMap<String, String>();
         expectedUser.put("username", "foo");
@@ -89,7 +91,7 @@ public class RoundtripTest {
         HashMap<String, Object> claims = new HashMap<String, Object>();
         claims.put("foo", true);
         claims.put("bar", false);
-        String token = signer.sign(claims, "my secret");
+        String token = signer.sign(claims);
         Map<String, Object> decoded = verifier.verify(token);
         assertEquals(claims, decoded);
     }
@@ -101,7 +103,7 @@ public class RoundtripTest {
     @Test
     public void shouldOptionsIat() throws Exception {
         HashMap<String, Object> claims = new HashMap<String, Object>();
-        String token = signer.sign(claims, "my secret",
+        String token = signer.sign(claims,
                 new JWTSigner.Options().setIssuedAt(true));
         Map<String, Object> decoded = verifier.verify(token);
         assertEquals(decoded.size(), 1);
@@ -113,7 +115,7 @@ public class RoundtripTest {
     @Test
     public void shouldOptionsTimestamps() throws Exception {
         HashMap<String, Object> claims = new HashMap<String, Object>();
-        String token = signer.sign(claims, "my secret",
+        String token = signer.sign(claims,
                 new JWTSigner.Options()
         .setExpirySeconds(50).setNotValidBeforeLeeway(10).setIssuedAt(true));
         Map<String, Object> decoded = verifier.verify(token);
@@ -128,7 +130,7 @@ public class RoundtripTest {
     @Test
     public void shouldOptionsJti() throws Exception {
         HashMap<String, Object> claims = new HashMap<String, Object>();
-        String token = signer.sign(claims, "my secret",
+        String token = signer.sign(claims,
                 new JWTSigner.Options().setJwtId(true));
         Map<String, Object> decoded = verifier.verify(token);
         assertEquals(decoded.size(), 1);
