@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -28,24 +29,33 @@ public class JWTSigner {
 
     /**
      * Generate a JSON Web Token.
+     *  using the default algorithm HMAC SHA-256 ("HS256")
+     * and no claims automatically set.
      * 
      * @param claims A map of the JWT claims that form the payload. Registered claims
      *               must be of appropriate Java datatype as following:
      *               <ul>
      *                  <li>iss, sub: String
      *                  <li>exp, nbf, iat, jti: numeric, eg. Long
-     *                  <li>aud: String, or Collection<String>
+     *                  <li>aud: String, or Collection&lt;String&gt;
      *               </ul>
      *               All claims with a null value are left out the JWT.
+     *               Any claims set automatically as specified in
+     *               the "options" parameter override claims in this map.
+     *               
+     * @param key Key to use in signing. Used as-is without Base64 encoding.
      * 
-     * Non-registered claims are not inspected.
+     * @param options Allow choosing the signing algorithm, and automatic setting of some registered claims.
      */
-    public String sign(Map<String, Object> claims, String key, Algorithm algorithm, Options options) {
-        List<String> segments = new ArrayList<String>();
+    public String sign(Map<String, Object> claims, String key, Options options) {
+        Algorithm algorithm = Algorithm.HS256;
+        if (options != null && options.algorithm != null)
+            algorithm = options.algorithm;
 
+        List<String> segments = new ArrayList<String>();
         try {
             segments.add(encodedHeader(algorithm));
-            segments.add(encodedPayload(claims));
+            segments.add(encodedPayload(claims, options));
             segments.add(encodedSignature(join(segments, "."), key, algorithm));
         } catch (Exception e) {
             throw (e instanceof RuntimeException) ? (RuntimeException) e : new RuntimeException(e);
@@ -55,30 +65,15 @@ public class JWTSigner {
     }
 
     /**
-     * Generate a JSON Web Token with all options unset.
+     * Generate a JSON Web Token using the default algorithm HMAC SHA-256 ("HS256")
+     * and no claims automatically set.
+     *
+     * @param key Key to use in signing. Used as-is without Base64 encoding.
      * 
-     * For details, see the four parameter variant of this method.
-     */
-    public String sign(Map<String, Object> claims, String key, Algorithm algorithm) {
-        return sign(claims, key, algorithm, new Options());
-    }
-    
-    /**
-     * Generate a JSON Web Token using the default algorithm HMAC SHA-256 ("HS256").
-     * 
-     * For details, see the four parameter variant of this method.
-     */
-    public String sign(Map<String, Object> claims, String key, Options options) {
-        return sign(claims, key, Algorithm.HS256, options);
-    }
-    
-    /**
-     * Generate a JSON Web Token using the default algorithm HMAC SHA-256 ("HS256") and all options unset.
-     * 
-     * For details, see the four parameter variant of this method.
+     * For details, see the three parameter variant of this method.
      */
     public String sign(Map<String, Object> claims, String key) {
-        return sign(claims, key, Algorithm.HS256, new Options());
+        return sign(claims, key, null);
     }
     
     /**
@@ -99,8 +94,9 @@ public class JWTSigner {
 
     /**
      * Generate the JSON web token payload string from the claims.
+     * @param options 
      */
-    private String encodedPayload(Map<String, Object> _claims) throws Exception {
+    private String encodedPayload(Map<String, Object> _claims, Options options) throws Exception {
         Map<String, Object> claims = new HashMap<String, Object>(_claims);
         enforceStringOrURI(claims, "iss");
         enforceStringOrURI(claims, "sub");
@@ -109,11 +105,26 @@ public class JWTSigner {
         enforceIntDate(claims, "nbf");
         enforceIntDate(claims, "iat");
         enforceString(claims, "jti");
+        
+        if (options != null)
+            processPayloadOptions(claims, options);
 
         String payload = new ObjectMapper().writeValueAsString(claims);
         return base64UrlEncode(payload.getBytes("UTF-8"));
     }
     
+    private void processPayloadOptions(Map<String, Object> claims, Options options) {
+        long now = System.currentTimeMillis() / 1000l;
+        if (options.expirySeconds != null)
+            claims.put("exp", now + options.expirySeconds);
+        if (options.notValidBeforeLeeway != null)
+            claims.put("nbf", now - options.notValidBeforeLeeway);
+        if (options.isIssuedAt())
+            claims.put("iat", now);
+        if (options.isJwtId())
+            claims.put("jti", UUID.randomUUID().toString());
+    }
+
     private void enforceIntDate(Map<String, Object> claims, String claimName) {
         Object value = handleNullValue(claims, claimName);
         if (value == null)
@@ -243,11 +254,27 @@ public class JWTSigner {
         return joined.toString();
     }
 
+    /**
+     * An option object for JWT signing operation. Allow choosing the algorithm, and/or specifying
+     * claims to be automatically set.
+     */
     public static class Options {
+        private Algorithm algorithm;
         private Integer expirySeconds;
         private Integer notValidBeforeLeeway;
-        private boolean setIssuedAt;
-        private boolean setJwtId;
+        private boolean issuedAt;
+        private boolean jwtId;
+        
+        public Algorithm getAlgorithm() {
+            return algorithm;
+        }
+        /**
+         * Algorithm to sign JWT with. Default is <code>HS256</code>.
+         */
+        public void setAlgorithm(Algorithm algorithm) {
+            this.algorithm = algorithm;
+        }
+        
         
         public Integer getExpirySeconds() {
             return expirySeconds;
@@ -273,27 +300,27 @@ public class JWTSigner {
             return this;
         }
         
-        public boolean isSetIssuedAt() {
-            return setIssuedAt;
+        public boolean isIssuedAt() {
+            return issuedAt;
         }
         /**
          * Set JWT claim "iat" to current timestamp. Defaults to false.
          * Overrides content of <code>claims</code> in <code>sign()</code>.
          */
-        public Options setSetIssuedAt(boolean setIssuedAt) {
-            this.setIssuedAt = setIssuedAt;
+        public Options setIssuedAt(boolean issuedAt) {
+            this.issuedAt = issuedAt;
             return this;
         }
         
-        public boolean isSetJwtId() {
-            return setJwtId;
+        public boolean isJwtId() {
+            return jwtId;
         }
         /**
          * Set JWT claim "jti" to a pseudo random unique value (type 4 UUID). Defaults to false.
          * Overrides content of <code>claims</code> in <code>sign()</code>.
          */
-        public Options setSetJwtId(boolean setJwtId) {
-            this.setJwtId = setJwtId;
+        public Options setJwtId(boolean jwtId) {
+            this.jwtId = jwtId;
             return this;
         }
     }
